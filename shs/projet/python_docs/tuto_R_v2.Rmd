@@ -1,0 +1,667 @@
+---
+title: "tuto_R"
+date: "`r Sys.Date()`"
+author: "Robert A. T. Avery"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    toc_depth: 4
+---
+
+# Tutoriaux R
+**SHS - Psychologie sociale**
+
+## 1. Setting up markdown file
+
+### Markdown options und chunks
+
+> Ce premier chunk s'insère avec la commande : alt + cmd + i. A l'intérieur, nous pouvons y mette du code qui sera compilé lorsque nous 'tricoterons' ou 'knit' notre markdown.
+  Pour le compiler avant : soit on appuie sur la flèche ferte, soit on selectionne le code voulu et on appuie sur cmd et enter.
+
+```{r setup, include=FALSE}
+# appel les packages necessaire pour ce format (template) de markdown
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+               warning=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE)
+opts_knit$set(width=75)
+```
+
+
+### Ecrire dans Markdown 
+
+On peut soit écrire dans le markdown directement. Comme à l'instant. 
+
+> Ou alors insérer une boîte de texte à l'aide du symbole >
+
+La mise en page des markdown suit le langage LateX la plupart du temps. Si vous avez des questions de mise en page veuillez vous référez au cheat sheet suivant <https://rstudio.com/resources/cheatsheets/> (aussi sur moodle sous la séance plénière du 17.03.21)
+
+Les outils de mise en page les plus souvent utilisés sont :
+  * *italic* pour de l'italic
+  * **bold** pour bold
+  * $$E = MC{2}$$ pour une equation en bloc ou 
+  * $\alpha = \beta$ pour equation en ligne
+  * Les hashtag signifie les niveau de titre # = titre de niveau 1, ## pour niveau 2, etc.
+  * pour ajouter une image $![légende]("../dossier/lien vers l'image en question")$ 
+    - sous rubrique
+  * les note en bas de page[^1] 
+  - [^1]: Sont fait comme ceci
+
+### les packages le plus souvent utilisés
+```{r packages load, include=TRUE}
+#Markdown packages
+library(tidyverse)
+library(tinytex)
+library(rticles)
+library(xaringan)
+library(sjPlot)
+library(lattice)
+library(latticeExtra)
+library(rmdformats)
+library(see)
+library(plm)
+
+#Visualisation
+library(ggplot2)
+library(ggthemes)
+library(gmodels)
+library(kableExtra)
+library(rockchalk)
+
+#Base stats packages
+library(plotrix)
+library(Rmisc)
+library(psych)
+library(sjmisc)
+library(nortest)
+library(pastecs)
+library(car)
+#library(Rcmdr)
+source("../functions/outlierKD.R")
+library(effects)
+library(lm.beta)
+
+# ez anova tools
+library(ez)
+library(stats)
+library(DescTools)
+
+#MLM packages
+library(nlme) # linear models with intra participant correlations (repeated measures)
+library(haven)
+library(lme4)
+library(lmerTest)
+```
+
+### Concvention du cours et élément de base
+
+  * dans un chunck '<-' permet de créer un objet (avec le nom de gauche) partir de ce qu'il y a à droite.
+  * les objets créés sont suivis de .type d'object. Par exemple, pour des données (.dat)
+
+---------------------------
+
+## 2.Data
+
+### Loading data
+
+Les données doivent être nettoyées avant d'être utilisée.
+Nous allons voir les commandes pour importer des données dans votre Markdown
+
+  1. Enregistrer vos fichiers de données .csv dans le dossier 'data' du projet
+  2. Les importer en utilisant le chunk suivant :
+
+```{r import data messy, echo=TRUE, warning=FALSE}
+# Data set pas encore nettoyé
+messy.dat <- read_csv("../data/looks_messy.csv")
+
+# pour inspecter les premières lignes
+head(messy.dat)
+```
+
+ 3. Si vos données sont 'tidy' et wide alors on obtient
+ 
+```{r import data tidy, echo=TRUE, warning=FALSE}
+# Data set 'tidy'
+tidy.dat <- read_csv("../data/looks_tidy.csv")
+head(tidy.dat)
+tail(tidy.dat)
+```
+
+---
+
+## 3. Describing the data
+
+### Decrire les données avec des chiffres
+
+#### load the Data 
+
+Pour décrire les données nous allons utiliser la fonction describe du package {psych}
+  * Premièrement importons les données de l'exercice.
+  
+```{r importer data tuto}
+tuto.dat <- read_csv("../data/tuto_data.csv")
+```
+
+  * Puis on decrit les données
+  
+```{r describe tuto_dat}
+#Pour le dataset entier
+describe(tuto.dat)
+
+#Pour une partie 
+describe(tuto.dat$hi_salary)
+
+#En utilisant une formule
+test.desc <- aggregate(formula = hi_salary ~ sex, data =tuto.dat, FUN = describe) %>% as.data.frame()
+tab_df(test.desc)
+
+# Pour l'erreur standard
+std.error(tuto.dat$hi_salary)
+```
+
+  * Nous pouvons aussi créer un tableau de descriptives à partir de certains groupes en combinant certaines fonctions
+
+```{r decrire selon certains facteurs ou modalite}
+# Précision des facteurs : Sous group_by suivi de la base de données et du ou des facteurs, la précision des facteurs permet d’obtenir nos indices statistiques en fonction de leurs modalités :
+
+## Précision des statistiques et de la variable quantitative : Sous summarise suivi des fonctions désirées, en l’occurrence le nombre d’observations (n), la moyenne (mean) et l’écart-type (sd) de la variable quantitative. Les noms Nombre, Moyenne et EcartType sont les noms que vous souhaitez attribuer aux colonnes pour la fonction désirée et peuvent être modifiés selon besoins
+group_by(tuto.dat, sex, wants_child) %>% 
+  dplyr::summarise(
+    Nombre = n(), 
+    Mediane = median(hi_salary, na.rm = TRUE),
+    EcartIQ = IQR(hi_salary, na.rm = TRUE),
+    Moyenne = mean(hi_salary, na.rm = TRUE)
+  )
+
+```
+
+### Décrire des données avec des graphes (plots)
+
+  * Pour décrire nos données de manière visuelles nous avons le choix entre différents graphiques. Le plus souvent nous utiliseront des
+    - histogrammes 
+    - boxplots
+  * Pour décrire des effets (vos résultats), nous utiliseront surtout :
+    - des line charts
+    - scatterplot avec des lignes de régression.
+  * Ne pas oublier de coder en tant que facteur les variables importantes (as.factor(data$la_variable))
+
+ Pour faire les différents graphiques nous utiliseront les packages "ggplot2" ainsi que "plotrix".
+ GGplot2 utilise un language basé un 'couche' appelés layers dans lesquels ont estime 7 paramètres importants:
+
+  * the holy 7 parameters
+    - *data*
+    - *geom_function* (what object is being plotted.. line, bar, etc...)
+    - *mapping = aes*(thetics), some *stats* and *positions*
+    - what *coordinate system* (often cartesian system x,y)
+    -  *facet_function*
+  * on peut toujours trouver les arguments en tapant ?geom_votregeomenquestion
+  
+####  Voici un example d'histogramme
+  
+```{r histogramme exemple}
+hi_salary.histo <- ggplot(tuto.dat, aes(hi_salary)) # créer l'objet ainsi que insérer les data
+hi_salary.histo + # + ajoute les layers
+  geom_histogram(
+    aes(y = stat(density)), size = 0.7,  # quel forme de graph (= geom_) et quel aesthetics va-t-on mapper ?
+    alpha = 1, colour = "black", fill ="orange") + # quelques options du geom
+  geom_density(size = 0.5) + # un autre pour la densité
+  labs(x = "axe des x", y = "axe des y", title = "titre", subtitle = "sous-titre", caption = "légende")+ # les légendes 
+  theme_bw() # un theme pour faire joli
+```
+
+####  Un exemple de boxplot
+  
+```{r boxplot exemple}
+hi_salary.boxplot <- ggplot(tuto.dat, aes(sex, hi_salary)) # créer l'objet ainsi que insérer les data
+hi_salary.boxplot + # + ajoute les layers
+  geom_boxplot(size = 0.7,  alpha = 1, colour = "black", fill ="orange") + # quelques options du geom
+  labs(x = "axe des x", y = "axe des y", title = "titre", subtitle = "sous-titre", caption = "légende")+ # les légendes 
+  theme_bw() # un theme pour faire joli
+```
+
+#### Stats graphs 
+
+  Parfois nous voulons faire un graph d'une interaction pour nos effets. Pour ce faire il faut créer un objet contenant les infos à ensuite donner au graphique.
+  
+  S'il y a des NA on peut les enlever en les repérants avec la commande : object <- object[-c(ligneA, ligneB),]
+  
+  
+  * D'abord pour deux variables sans interactions
+  
+```{r}
+# créer l'objet
+df <- ddply(tuto.dat, c("condition_exp", "sex"), dplyr::summarize,
+            Mean = mean(attractive, na.rm=T),
+            SE   = std.error(attractive, na.rm=T))
+df
+```
+
+```{r bar charts}
+attractive.bar <- ggplot(df, aes(x = condition_exp, y = Mean, fill = sex)) 
+attractive.bar +
+  geom_bar(stat = "identity", position = "dodge") + 
+  ggtitle("XXX") + 
+  ylab("Score") +
+  geom_errorbar(aes(ymin = Mean-SE, ymax = Mean+SE), width = 0.2, position = position_dodge(0.9)) +
+  theme_bw()
+```
+
+  
+  * Pour une interaction
+  
+```{r}
+cond.sex.attractive <- ddply(tuto.dat, .(condition_exp, sex),  # créer l'objet
+                     dplyr::summarise, val=mean(attractive, na.rm=T))
+cond.sex.attractive # controler l'objet
+```
+
+```{r plot le tout}
+interaction.plot <- ggplot(tuto.dat, aes(x=condition_exp, y=attractive, colour=sex)) 
+interaction.plot + 
+  geom_boxplot() + 
+  geom_point(data = cond.sex.attractive, aes(y = val)) +
+  geom_line(data = cond.sex.attractive, aes(y = val, group = sex)) + 
+  ggtitle("Score en fonction de...") + ylab("Score de ...") +
+  theme_bw()
+```
+
+  * exemple en scatterplot
+  
+```{r scatterplot example}
+example.plot <- ggplot(tuto.dat, aes(condition_exp, attractive, colour = sex)) +
+  geom_point(position = position_jitter(width = 0.3, height = 0.1)) + 
+  geom_smooth(aes(group = sex),method = lm) +
+  labs(
+    title = "Scatterplots for test scores",
+    subtitle = "s",
+    caption = "c",
+    x = "x",
+    y = "y") +
+  theme_bw()
+
+example.plot
+```
+
+---
+
+## 4. Assomptions 
+
+  Il convient de contrôler un certain nombres d'assomptions avant de procéder aux analyses inférentielles. Celles-ci sont :
+  - la normalité
+  - les outliers
+  - heteroscedasticité
+  - sphéricité
+  - linéarité
+
+### Normalité
+
+  * La normalité peut-être controlée de manière visuelle
+    - histogramme (devraient suivre une courbe normale)
+    - boxplots (moyenne au milieu de la boite, moustache égales, pas d'outliers)
+    - qqplot (devraient suivre la diagonale)
+    
+```{r norm histogramme}
+norm.attractive <- ggplot(tuto.dat, aes(attractive))  + 
+  geom_histogram(aes(y = ..density..), fill = "white", colour = "black", binwidth = 1) + 
+  labs(
+    x= "X",
+    y = "Y") + 
+  stat_function(fun=dnorm, args=list(mean = mean(tuto.dat$attractive, na.rm = TRUE), sd = sd(tuto.dat$attractive, na.rm = TRUE)), colour = "blue", size=1) +
+  theme_bw()
+
+norm.attractive 
+```
+
+```{r norm qqplot}
+qplot(sample = tuto.dat$attractive, stat="qq")
+```
+
+```{r norm boxplot}
+# voir section graphique
+```
+  
+  * Avec des chiffres
+    - test de Liliefors
+      - si significatif alors donnée non normales
+      - si grand nombre de participant.e.s (N > 50) alors test trop puissant et sera trop souvent sign. -> observation
+    - Skew and Kurtosis 
+    
+```{r example Liliefors}
+
+# test normalité en fonction d'un groupe ici feminin
+lillie.test(tuto.dat$attractive[tuto.dat$sex=="Female"])
+# nombre de cas 
+length(tuto.dat$attractive[tuto.dat$sex=="Female"])
+
+
+lillie.test(tuto.dat$attractive[tuto.dat$sex=="Male"])
+length(tuto.dat$attractive[tuto.dat$sex=="Male"])
+
+# on en concluerait que notre distribution n'est pas normale
+```
+
+```{r example skew kurtosis}
+# pour avoir plusieurs variables
+round(stat.desc(tuto.dat[, c("attractive", "hi_salary")], basic = FALSE, norm = TRUE), digits = 3)
+
+# par groupe
+by(tuto.dat[, c("attractive", "hi_salary")], tuto.dat$sex, describe) %>% tab_dfs(titles = c("female", "male"))
+```
+
+### Outliers
+
+  * On peut contrôler les outliers de manières visuelles avec les boxplots 
+  * Pour obtenir des infos plus spécifiques on peut utiliser :
+  
+```{r detecting outliers}
+boxplot(tuto.dat$hi_salary)$out #Valeurs des VE
+length(boxplot(tuto.dat$hi_salary)$out) # nombre de VE
+```
+
+  * Il convient aussi d'utiliser la fonction (qui n'est malheureusement pas dans un package) outliersKD que l'on peut *source* (comme un library pour un script qui résume une fonction écrite). Celle ci se trouve dans le dossier 'functions' et il est sourcer au début avec les autres package.
+  * Cette fonction permet
+    - de voir la valeur de notre moyenne avec et sans
+    - ainsi que les boxplots avec et sans
+    - l'histogramme de la variable avec et sans
+    
+  
+```{r outlierKD}
+#taper dans la console outlierKD(data, la_variable_d'intéret)
+# puis écrire oui ou non pour valider le choix. Attention ! ces cas seront remplacé par des NA
+```
+
+### Homogénéité des variance
+
+  * Il faut que la variance de chaque variable soient égaux afin de pouvoir être comparable.
+    - on utilise soit le test de Lavene (qui doit être non significatif) mais celui ci l'est trop souvent alors on utilise aussi 
+    - Hartley's F max = le ratio des variances 
+      - le plus large / le plus petit (et le n-1 est le groupe avec le plus grand N)
+
+![Hartley's Fmax table](../plots/hartley_fmax_table.png)
+![Hartley's Fmax plot](../plots/hartley_plot.png)
+
+```{r variance homogeneity Hartleys F}
+# Levene test
+leveneTest(tuto.dat$attractive, tuto.dat$condition_exp, center = mean)  %>%  
+  knitr::kable(., digits = 2, format = "html", align = 'c') %>% 
+  kableExtra::kable_styling(., bootstrap_options = "striped")
+
+# Hartley's Fmax
+ff <- tuto.dat %>% group_by(condition_exp) %>%
+  dplyr::summarise(
+    Df = n()-1,
+    Variance = var(attractive, na.rm = T))
+ff$Variance[1] / ff$Variance[2]
+```
+
+
+### Heteroscedasticité
+
+  * Il convient de contrôler que la variance des résiduels soient égales à chaque degré de nos prédicteurs; qu'ils soient donc homoscedastique. Sans quoi nos conditions/variables prédictrice continues ne serait pas comparables.
+    - ceci se teste par inspection visuelle:
+
+```{r heteroscedasticity check}
+# pour un model simple qui cherche à prédire l'importance de l'attractivité en fonction de la région langagière et du genre
+attractive.mod <- lm(attractive ~ sex + condition_exp + sex*condition_exp, data = tuto.dat, na.action = na.omit)
+
+#fitted values pour plot et std. and studentised residuals dans nos données
+tuto.dat$fitted <- attractive.mod$fitted.values
+tuto.dat$standardized.residuals<- rstandard(attractive.mod)
+tuto.dat$studentized.residuals<-rstudent(attractive.mod)
+
+# plot des fitted values against std. residuals
+scatter.resid <- ggplot(tuto.dat, aes(fitted, studentized.residuals))
+scatter.resid + geom_point() + geom_smooth(method = "lm", colour = "Blue")+ labs(x = "Fitted
+Values", y = "Studentized Residual")
+
+# qqplot des residuels
+qqplot.resid <- qplot(sample = tuto.dat$studentized.residuals, stat="qq") + labs(x =
+"Theoretical Values", y = "Observed Values")
+qqplot.resid
+```
+
+### independence (of errors)
+
+  * On peut contrôler ceci avec un test de Durbin-Watson test
+    - idéalement à 2 (pas <1 et > 3)
+
+```{r error independance}
+dwt(attractive.mod) 
+```
+
+
+### mutlicolinearité
+
+  * Prédicteurs ne doivent pas être parfaitement corrélés.
+
+  * To check for multicollinearity, use the VIF values. If these values are *less than 10* then that indicates there probably isn’t cause for concern. If you take the average of VIF values, and this average is not substantially greater than 1, then that also indicates that there’s no cause for concern.
+  
+```{r multicolinearity check}
+vif(attractive.mod)
+1/vif(attractive.mod)
+mean(vif(attractive.mod))
+```
+
+### Linéarité
+
+  * La relation entre les variables doit suivre une relation linéaire.
+  * inspection visuelle : Ce premier graphique permet de savoir si les valeurs prédites (ou fitted values, en x) et les résidus (ou residuals, en y) suivent une distribution bivariée linéaire. Pour que la condition de linéarité du modèle soit respectée, le segment représenté en rouge doit se situer, idéalement, sur une valeur résiduelle (ou y) égale à 0. Nous pouvons considérer cette condition respectée.
+
+```{r linearity}
+## plot(model.1, which = 1) # residuals vs fitted une fois le modèle écrit (cf. 5 )
+```
+
+
+### Sphéricité
+
+  * Pour les mesures répétées à plus de 3 conditions
+  * La variance des différences entre pair de contidions doit être égale.
+  * test de Mauchly (si on fait avec )
+  
+---
+
+## 5. Linear regression
+
+### Writting/running models
+
+```{r prep}
+factor(tuto.dat$sex)
+```
+
+  Le but de a régression linéaire permet de savoir si une variable quantitative (régression simple) ou plusieurs variables quantitatives (régression multiple), appelées prédicteurs (ou VI quantitatives), sont passible(s) de prédire les valeurs d’une autre variable quantitative appelée critère (ou VD).
+
+  * General form : newModel<-lm(outcome ~ predictor(s), data = dataFrame, na.action = an action))
+  
+```{r general form}
+model.0 <- lm(n_partners ~ sex, data = tuto.dat, na.action = na.omit)
+summary (model.0)
+```
+
+  * La partie du tableau « Coefficients » traite des différents prédicteurs, des coefficients de la pente (coefficients B non standardisés, sous Estimate) 
+  * et de leur significativité ou non (t-tests, rejet ou non de H0 selon laquelle les coefficients beta de pente sont égal à 0). Si nous prenons les problèmes médicaux, le coefficient beta de la pente est de .32 (et significativement différent de 0 car p < .05). Cela signifie que, lorsque les problèmes médicaux augmentent d’une unité, la consommation de drogue augmente de .32 unités.
+  * Les statistiques générales de notre modèle (pourcentages de variance expliquée et significativité).       - Pour rappel, ce modèle considère précisément le genre du•de la participant•e comme prédicteur et le nombre de partenaire comme VD.
+    - Le multiple R2 est la variance du critère expliquée par le prédicteur dans l’échantillon, et le R2 ajusté ce même pourcentage de variance estimé pour la population.
+    
+    
+ Pour des coefficients de régression standardisés on emploie la même formule mais avec lm.beta
+ 
+```{r formule de base avec coefficient std}
+lm.beta(model.0)
+```
+  
+  Pour visualiser rapidement les effets on peut employer plot(allEffects(mon_modele.version))
+```{r all effects}
+plot(allEffects(model.0))
+# ici il n'y en a qu'un
+```
+
+  Pour n'avoir que les coefficients (à noter dans notre rapport) :
+  
+```{r getting coefficients}
+coef(model.0)
+```
+
+  
+### ajouter des prédicteurs
+
+  Souvent nous voulons savoir l'effet d'un prédicteur numérique sur notre VD. Il s'agit alors de l'ajouter dans le modèle de la même manière.
+  
+```{r deux predicteurs}
+model.1 <- lm(n_partners ~ sex + hi_salary, data = tuto.dat, na.action = na.omit)
+summary(model.1)
+```
+  
+  Nous pouvons les visualiser de la manière suivante :
+
+```{r plot deux pred}
+# using allEffect
+plot(allEffects(model.1))
+
+# the nice way
+ggplot(tuto.dat, aes(x=hi_salary, y=n_partners, fill=sex, color=sex)) + 
+        geom_point(size = 1.5) + 
+        labs(x = "Importance d'avoir haut salaire", y ="Nombre de partenaire", colour = "Genre") +
+        scale_color_manual(values=c('#999999','#E69F00')) +
+        scale_fill_manual(values =c('#999999','#E69F00')) +
+        guides(fill = F) +
+        geom_smooth(method=lm) +
+        theme_bw()
+
+```
+
+### Ajouter terme d'interaction (moderation)
+
+  Une variable modératrice (ou modérateur) est une variable qui altère la force, et possiblement la direction, du lien entre un prédicteur et un critère. Ainsi, l’effet du prédicteur sur le critère dépend également des niveaux de cette variable modératrice. La modération est l'équivalent de l'effet d'interaction de l'ANOVA pour la régression. 
+  
+  
+  Nous voyons ici sur le plot que nos lignes de régression ne sont pas parrallèle, il se pourait donc qu'il y ait un effet d'interaction. Il s'agit alors de l'ajouter dans votre modèle comme un prédicteur à part entière.
+  
+```{r adding interaction term}
+model.2 <- lm(n_partners ~ sex + hi_salary + sex*hi_salary, data = tuto.dat, na.action = na.omit)
+summary(model.2)
+```
+
+```{r plotting interaction term}
+plotSlopes(model.2, plotx="hi_salary", modx="sex",
+           interval="confidence", main="Graphique de moderation",
+           xlab="important haut salaire", ylab="nombre de partenaire")
+
+```
+ 
+  Ici la paramètre d'interaction n'est pas significatif, nous n'avons donc qu'un seul effet de genre à reporter.
+  
+### Comparer des modèle
+
+  On peut comparer des modèles qui sont nesté avec la fonction anova()
+  
+```{r comparing two models}
+anova(model.1, model.2)
+```
+  
+  Ici l'output nous montre que notre F score ne s'est pas significativement améliorer. En d'autre terme, l'inclusion de cette variable dans notre modèle n'a pas su mieux répartir la variance de celui-ci.
+
+
+### Mesure répétées - quick walkthrough
+
+```{r loading ratio_data}
+# nouvelles données longitudinales
+longLoss_ratio <- read_csv("../data/longLoss_ef.csv") 
+longLoss_ratio <- longLoss_ratio %>% subset(select = -c(lickert_score))
+
+longLoss_ratio$PE_measure <-factor(longLoss_ratio$PE_measure)
+```
+
+```{r anova pour mesures repetees}
+model.repeated <- ezANOVA(data = longLoss_ratio,
+                         dv = .(ratio_OT),
+                         wid = .(participant_ID),
+                         within = .(PE_measure),
+                         detailed = T, type = 3)
+model.repeated
+```
+  Ceci nous montre que les trois conditions ne sont pas sphérique et que nous avons un effet de la mesure répétée. Pour voir entre quelles conditions de celle-ci elle opère nous pouvons faire des tests post-hoc.
+
+```{r test post hoc}
+# recreating model sans facteurs intersujets pour voir ou sont les différences
+model.repeated.post <- aov(ratio_OT ~ PE_measure, 
+                         data=longLoss_ratio)
+
+# post hoc tests for all variables (other specifiy under 'which' = "")
+PostHocTest(model.repeated.post, which=NULL, 
+            method="hsd", conf.level=.95)
+
+# summary
+summary(lm(model.repeated.post))
+
+```
+
+  et savoir comment les décrires en fonctions des variables selectionnées
+  
+```{r repeated descriptives}
+# getting descriptives by variable
+
+ezStats(data = longLoss_ratio,
+                         dv = .(ratio_OT),
+                         wid = .(participant_ID),
+                         within = .(PE_measure))
+```
+
+```{r repeated plots}
+ezPlot(data = longLoss_ratio,
+       dv = .(ratio_OT),
+       wid = .(participant_ID),
+       within = .(PE_measure),
+       x = .(PE_measure),
+       do_lines = TRUE)
+```
+
+
+---
+
+## 6. Fidélité
+
+### Choisir ses variables  
+
+  * Lorsque vous aurez différents items, il conviendra de voir si celles si corrèlent ensemble afin de savoir s'il est acceptable de toutes les garder dans votre quête de score final.
+    - Ceci se fait avec l'alpha de Cronbach
+  
+  * Tout d'abord, il convient de mesurer les items sur la base des facteurs théoriques latent. Par exemple, il se peut que vos items soient une moitié en lien avec les émotions et les autres avec les intentions comportementales. Il faut les séparer. On peut faire cela en créant des subsets. 
+  
+```{r 6 subsetting}
+high_functionning <- tuto.dat[, c("hi_salary",	"fin_ed",	"ambitious", 	"attractive")]
+nice <- tuto.dat[, c("kind",	"humour", "wants_child",	"romantic", "creativity",	"honest")]
+```
+ 
+  * attention s'il y a des valeurs à recoder, ceci peut-être fait directement ici (si pas encore fait au moment des nettoyage de données)
+ 
+```{r 6 reverse coding}
+# l'argument keys = c(1, 1, 1, -1) pour un objet à 4 items ou le dernier est à inverser
+## directement dans la fonction suivante
+```
+
+  * la fonction de fiabilité et psych::alpha()
+  
+```{r 6 alpha}
+psych::alpha(high_functionning)
+psych::alpha(nice)
+```
+
+  * Les choses à garder en tête
+    - une bonne corrélation globale est de .8 (.7 acceptable, attention au dela de .9 les items sont identitiques)
+      - ceci correspond aux (raw_apha et leur écart type std.alpha)
+    - ensuite on a l'alpha global en fonction de si un ou l'autre item est enlevé
+    - Puis on a la colonne r.drop qui nous indique la correlation d'un item avec le reste.
+      - attention à ne pas en avoir en dessous de .3 !
+    - le tableau non missing response frequency :
+      - nous indique quel pourcentage de personnes ont répondu de la même manière au même item. Utile pour savoir si tout le monde répond identiquement alors probablement que cet item n'est pas très utile pour différencier vos participant.e.s.
+    - Une fois les items enlevées, il s'agit de refaire l'analyse afin de vérifier les nouveaux coefficients.
+
+---
